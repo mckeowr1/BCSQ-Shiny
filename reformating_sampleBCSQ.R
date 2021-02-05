@@ -232,8 +232,8 @@ step1 <- non_annotation %>% mutate(VARIANT_IMPACT = "No Annotation")
 
 #REJOIN AND ORDER
 
-table_ready<- bind_rows(G.Bscored , step1) %>% order_annotation() %>% select(!ANNOTATION) %>%
-  select(!CON1) %>% select(!CON2) %>% select(!REF_ALT_AA) %>% select(!AA_POS)
+table_ready<- bind_rows(G.Bscored , step1) %>% bind_rows(linkers) %>% order_annotation() %>% select(!ANNOTATION) %>%
+  select(!CON1) %>% select(!CON2) %>% select(!REF_ALT_AA) %>% select(!AA_POS) 
 
 
 #Work around to get Bscore and G Score Numeric
