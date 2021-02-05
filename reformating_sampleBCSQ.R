@@ -57,7 +57,7 @@ impact_scoring <- function(df) {  #Works for up to two multi consequences - can 
     order_annotation()
   return(clean)
 } #Uses Below functions to handle impact conversion & Multi-consequence variants
-  impact <- function(x) {
+impact <- function(x) {
   dplyr::recode(x,
 
                 "missense" ="MODERATE",
@@ -104,7 +104,7 @@ impact_scoring <- function(df) {  #Works for up to two multi consequences - can 
                 "*start_retained"="LOW")
 
 } #Converts Consequence to Impact
-  impact_numeric <- function(x) {
+impact_numeric <- function(x) {
   recode(x,
          "missense" =3,
          "synonymous"=1,
@@ -150,13 +150,13 @@ impact_scoring <- function(df) {  #Works for up to two multi consequences - can 
          "*start_retained"=1)
 
 }  #Handles multi-consequence with numneric to character
-  impact_numeric_tocharacter <- function(x){
+impact_numeric_tocharacter <- function(x){
   recode(x,
          "4"="HIGH",
          '3'="MODERATE",
          "2"="LOW",
          '1'="MODIFIER")
-  }
+}
 
 BCSQ_p_translate <- function(df){ #Fails for AA changes that go more than one position
   translated <- df %>%
@@ -164,8 +164,8 @@ BCSQ_p_translate <- function(df){ #Fails for AA changes that go more than one po
     dplyr::mutate("ALT_AA" = stringr::str_sub(df$AMINO_ACID_CHANGE,-1)) %>% #Grabs the ALT AA
     dplyr::mutate("AA_POS" = stringr::str_extract(df$AMINO_ACID_CHANGE, "([0-9])+")) %>% #Grabs the AA position
     tidyr::unite("REF_ALT_AA", "AA", "ALT_AA", sep= "|") #Unites AA, ALT
-    return(translated)
-  }
+  return(translated)
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 myarg <- args[1]
@@ -193,16 +193,16 @@ annotated <- data %>%  mutate(NO_ANN = str_detect(.$V6, pattern = "No_Annotation
 #   select(!Public.Name)
 #
 
-            #MARK SITES WITHOUT ANNOTATIONS -
+#MARK SITES WITHOUT ANNOTATIONS -
 
 # reformated$CONSEQUENCE[is.na(reformated$V6)] <- "No_Annotation"
 
-             #SPLIT INTO TWO DF'S
+#SPLIT INTO TWO DF'S
 # non_annotation <- reformated %>% mutate(NO_ANN = str_detect(.$CONSEQUENCE, pattern = "No_Annotation" )) %>% filter(NO_ANN == TRUE) %>% select(!NO_ANN)
 # annotated <- reformated %>%  mutate(NO_ANN = str_detect(.$CONSEQUENCE, pattern = "No_Annotation" )) %>% filter(NO_ANN == FALSE) %>% select(!NO_ANN)
 
 
-                  #ANNOTATED WORKFLOW
+#ANNOTATED WORKFLOW
 parsed <- parse_BCSQ(annotated) %>% mutate(linker = str_detect(.$CONSEQUENCE, pattern = "@" )) %>%
   filter(.$linker != TRUE | is.na(.$linker) ) %>% select(!linker) %>%
   left_join(name_key, by = c( "GENE" = "WormBase.Gene.ID")) %>% #Convert Gene from Wormbase ID to public name
@@ -210,21 +210,34 @@ parsed <- parse_BCSQ(annotated) %>% mutate(linker = str_detect(.$CONSEQUENCE, pa
   select(!Public.Name)
 
 grouped <- parsed %>% group_by(CHROM,POS,SAMPLE,REF,ALT,GENE,CONSEQUENCE,STRAND,DNA_CHANGE,AMINO_ACID_CHANGE) %>%
-            nest() %>%
-            mutate(TRANSCRIPTS =  as.character(map(data, prn_transcript))) %>% #Would love to remove std out from this
-            select(-data) %>% as_data_frame()
+  nest() %>%
+  mutate(TRANSCRIPTS =  as.character(map(data, prn_transcript))) %>% #Would love to remove std out from this
+  select(-data) %>% as_data_frame()
 #Add impact scores
 impacted <- impact_scoring(grouped)
 #Grantham & Blossum Scoring
 G.Bscored <- BCSQ_p_translate(impacted) %>% left_join(AA_SCORES, by = "REF_ALT_AA" )
 
 
-            #UNANNOTATED WORKFLOW - Instead of creating consequence with no annotation make Varaint impact
+
+#UNANNOTATED WORKFLOW - Instead of creating consequence with no annotation make Varaint impact
 step1 <- non_annotation %>% mutate(VARIANT_IMPACT = "No Annotation")
 
-            #REJOIN AND ORDER
-
-table_ready<- data.table::rbindlist(list(G.Bscored , step1), fill = T) %>% order_annotation() %>% select(!ANNOTATION)
 
 
-write.csv(table_ready, (glue::glue("{myarg}.prepped.csv")))
+#REJOIN AND ORDER
+
+table_ready<- bind_rows(G.Bscored , step1) %>% order_annotation() %>% select(!ANNOTATION) %>%
+  select(!CON1) %>% select(!CON2) %>% select(!REF_ALT_AA) %>% select(!AA_POS)
+
+
+#Work around to get Bscore and G Score Numeric
+table_ready2 <- table_ready %>% mutate(GSCORE = sapply(table_ready$GSCORE, as.integer)) %>% mutate(BSCORE = sapply(table_ready$BSCORE, as.integer))
+
+#Add in Numeric Proxy for NA - is replaced in SQL import
+table_ready2$GSCORE[is.na(table_ready2$GSCORE)] <- -1
+table_ready2$BSCORE[is.na(table_ready2$BSCORE)] <- 200
+
+
+
+write.csv(table_ready2, (glue::glue("{myarg}.prepped.csv")))
