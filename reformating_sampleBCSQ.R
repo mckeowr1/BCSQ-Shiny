@@ -203,13 +203,18 @@ annotated <- data %>%  mutate(NO_ANN = str_detect(.$V6, pattern = "No_Annotation
 
 
 #ANNOTATED WORKFLOW
-parsed <- parse_BCSQ(annotated) %>% mutate(linker = str_detect(.$CONSEQUENCE, pattern = "@" )) %>%
-  filter(.$linker != TRUE | is.na(.$linker) ) %>% select(!linker) %>%
+parsed <- parse_BCSQ(annotated)
+
+add_gene <- parsed %>% mutate(linker = str_detect(.$CONSEQUENCE, pattern = "@" )) %>%
+  filter(.$linker != TRUE | is.na(.$linker) ) %>% select(!linker) %>% #Test if the is.na linker is still needed now that unannotated are seperated
   left_join(name_key, by = c( "GENE" = "WormBase.Gene.ID")) %>% #Convert Gene from Wormbase ID to public name
   mutate(GENE = .$Public.Name) %>%
   select(!Public.Name)
 
-grouped <- parsed %>% group_by(CHROM,POS,SAMPLE,REF,ALT,GENE,CONSEQUENCE,STRAND,DNA_CHANGE,AMINO_ACID_CHANGE) %>%
+linkers <- parsed  %>% mutate(linker = str_detect(.$CONSEQUENCE, pattern = "@" )) %>%
+  filter(.$linker == TRUE) %>% select(!linker) %>% mutate(VARIANT_IMPACT = "Linker")
+
+grouped <- add_gene %>% group_by(CHROM,POS,SAMPLE,REF,ALT,GENE,CONSEQUENCE,STRAND,DNA_CHANGE,AMINO_ACID_CHANGE) %>%
   nest() %>%
   mutate(TRANSCRIPTS =  as.character(map(data, prn_transcript))) %>% #Would love to remove std out from this
   select(-data) %>% as_data_frame()
