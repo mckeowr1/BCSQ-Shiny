@@ -78,7 +78,7 @@ ui <- fluidPage(
     column(4,
            checkboxGroupInput("IMPACT",
                               "Select Variant Impact:",
-                              choices = c("HIGH", "MODERATE", "LOW", "MODIFIER", "No Annotation"),
+                              choices = c("HIGH", "MODERATE", "LOW", "MODIFIER", "No Annotation", "Linker"),
                               selected = c("HIGH", "MODERATE")
 
            )
@@ -95,16 +95,28 @@ ui <- fluidPage(
   #                      multiple = T )
   #   )
   # ),
-  # fluidRow(
-  #   column(4,
-  #          sliderTextInput("BLOSSUM",
-  #                      "BLOSSUM:",
-  #                      choices = c(sort(unique(shiny_testdata$BSCORE))))
-  #
-  #
-  #   )
-  # ),
+  fluidRow(
+    column(4,
+           sliderInput("GRANTHAM",
+                       "GRANTHAM:",
+                       min = 0,
+                       max = 215,
+                       value = c(101, 150))
 
+
+    )
+  ),
+  fluidRow(
+    column(4,
+           sliderInput("BLOSUM",
+                       "BLOSUM:",
+                       min = -4,
+                       max = 11,
+                       value = c(-4, 0))
+
+
+    )
+  ),
 
   reactableOutput("table_filter_samples")
 
@@ -133,7 +145,7 @@ samples_filtered <- reactive({
   conn <- dbConnect(
         drv = RMySQL::MySQL(),
         user = 'root',
-        password = '<put in password>', #*******PUT INT PW BEFORE RUNNING*******
+        password = 'Fordracing#47',
         dbname = "bcsq_annotation",
         host = 'localhost')
       on.exit(dbDisconnect(conn), add = TRUE)
@@ -285,34 +297,26 @@ variantimpact_filtered <- reactive ({
       filter(VARIANT_IMPACT %in% input$IMPACT)
   }})
 
+grantham_filtered <-reactive ({
+  if(is.null(input$GRANTHAM)){
+    variantimpact_filtered()
+  } else {
+    variantimpact_filtered() %>%
+      filter(between(.$GSCORE, input$GRANTHAM[1], input$GRANTHAM[2])) #Insert or is "" - whatever the character is after SQL conversion
+  }})
 
-#Genomic Posistion Filtering
+blosum_filtered <- reactive ({
+  if(is.null(input$BLOSUM)){
+    grantham_filtered()
+  } else {
+    grantham_filtered() %>%
+      filter(between(.$BSCORE, input$BLOSUM[1], input$BLOSUM[2])) #Insert or is "" - whatever the character is
+  }})
 
-# genomic_pos_filtered <- reactive ({ #Currently Supports single chromosome queries
-#    if(input$GENOME_POS == ""){
-#      reactable(pool %>% tbl(input$SAMPLES) %>% head(n= 100) %>% as.data.frame())
-#    } else {
-#      chr_split <- strsplit(input$GENOME_POS, ":")
-#      chr <- chr_split[[1]][1]
-#      range_split <- strsplit(chr_split[[1]][2], "-") %>% as.data.frame() #Maybe could be more efficent
-#      samples_filtered() %>%
-#      filter( CHROM == chr) %>%
-#      filter(dplyr::between(POS, range_split[1,1], range_split[2,1]))
-#
-#    }})
-#
-#
 
-# consequence_filtered <- reactive ({
-#   if(is.null(input$CONSEQUENCE)){
-#     variantimpact_filtered()
-#   } else {
-#     variantimpact_filtered() %>%
-#       filter(CONSEQUENCE %in% input$CONSEQUENCE)
-#   }})
 
-    output$table_filter_samples <- renderReactable({reactable(variantimpact_filtered(),
-                                                              columns = list (
+    output$table_filter_samples <- renderReactable({reactable(blosum_filtered(),
+                                                              columns = list(
                                                               VARIANT_IMPACT = colDef (style =  function(value){
                                                                 if (value == "MODIFIER") {
                                                                   color <-  "#777"
@@ -326,13 +330,37 @@ variantimpact_filtered <- reactive ({
                                                                   color <- "#f0eee1"
                                                                 }
                                                                 list(color = color, fontWeight = "bold")
-                                                              })),
+                                                              }),
+                                                              GSCORE = colDef(style = function(value){
+                                                                if (is.na(value)){
+                                                                  color <- "#777"
+                                                                } else if (value <= 51) {
+                                                                  color <- "#15A306"
+                                                                }else if (between(value, 51, 100) ){
+                                                                   color <- "#F9B24D"
+                                                                } else if (between(value, 101, 150)){
+                                                                   color <- "#F54E2B"
+                                                                } else if ( value >= 151){
+                                                                   color <- "#BD0025"
+                                                                }
+                                                                list(color = color, fontWeight = "bold")
+                                                                }),
+                                                              BSCORE = colDef(style = function(value){
+                                                                  if (is.na(value)) {
+                                                                  color <- "#777"
+                                                                } else if (between(value, -4, -2)) {
+                                                                  color <- "#BD0025"
+                                                                } else if (between(value, -1, 1) ){
+                                                                  color <- "#F9B24D"
+                                                                } else if (between(value, 2, 4)){
+                                                                  color <- "#777"
+                                                                }
+                                                                  list(color = color, fontWeight = "bold")
+                                                              })
 
+                                                              ),
 
                                                               bordered = TRUE
-
-
-
 
                                                               )})
 }
