@@ -14,6 +14,6 @@ module load R/4.0.0
 
 for sample in AB1 CB4856 JU2007 QX1211 JU258 DL238 ;
 do
-  bcftools view -s $sample -x -Oz /projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.bcsq.vcf.gz | bcftools query -f'%CHROM %POS %REF %ALT [%SAMPLE %TBCSQ{*}]\n' > ${sample}_BCSQ.vcf ;
+  bcftools view -s $sample -x -Oz /projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.bcsq.vcf.gz | bcftools query -f'%CHROM %POS %REF %ALT [%SAMPLE %TGT %TBCSQ{*}]\n' > ${sample}_BCSQ.vcf ;
   Rscript reformating_sampleBCSQ.R $sample
 done
